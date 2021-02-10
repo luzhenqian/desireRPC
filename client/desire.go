@@ -15,11 +15,31 @@ type Desire struct {
 	s        serializer.Serializer
 }
 
-type Options func()
+type Option func(*Desire)
 
-func New(services Services, options ...Options) *Desire {
-	// TODO
-	return &Desire{Services: services, pool: make(ConnectionPool)}
+func New(services Services, options ...Option) *Desire {
+	client := &Desire{
+		Services: services,
+		pool:     make(ConnectionPool),
+		p:        &protocol.Desire{},
+		s:        &serializer.Desire{},
+	}
+	for _, option := range options {
+		option(client)
+	}
+	return client
+}
+
+func Protocol(p protocol.Protocol) Option {
+	return func(d *Desire) {
+		d.p = p
+	}
+}
+
+func Serializer(s serializer.Serializer) Option {
+	return func(d *Desire) {
+		d.s = s
+	}
 }
 
 // func New(p protocol.Protocol, s serializer.Serializer) *Desire {
@@ -32,23 +52,25 @@ type Address string
 // ConnectionPool tcp 连接池
 type ConnectionPool map[Address]net.Conn
 
-// Option 配置项
-type Option struct {
+// CallOption 配置项
+type CallOption struct {
 	KeepAlive    time.Duration
 	Header       protocol.VariableHeader
 	FunctionName FunctionName
 	RequestData  RequestData
 	ResponseData ResponseData
+	Types        serializer.Type
 }
 
 type FunctionName string
 type RequestData interface{}
 type ResponseData interface{}
+type Types []interface{}
 
 type Services map[ServiceName]Address
 type ServiceName string
 
-func (d *Desire) Call(serviceName ServiceName, option Option) error {
+func (d *Desire) Call(serviceName ServiceName, option CallOption) error {
 	if addr, ok := d.Services[serviceName]; ok {
 		return d.call(addr, option)
 	}
@@ -57,15 +79,18 @@ func (d *Desire) Call(serviceName ServiceName, option Option) error {
 }
 
 func (d *Desire) RegisterType(types ...serializer.Type) {
-	d.s.RegisterType(types)
+	if len(types) > 0 {
+		d.s.RegisterType(types)
+	}
 }
 
 // Call 调用 RPC 服务
-func (d *Desire) call(addr Address, option Option) error {
+func (d *Desire) call(addr Address, option CallOption) error {
 	conn, err := d.getConn(addr)
 	if err != nil {
 		return err
 	}
+	d.RegisterType(option.Types)
 	err = d.write(conn, option)
 	if err != nil {
 		return err

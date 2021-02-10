@@ -23,7 +23,7 @@ func main() {
 	clt.RegisterType(UserQueryParam{})
 
 	user := &User{}
-	err := clt.Call("UserServices", client.Option{
+	err := clt.Call("UserServices", client.CallOption{
 		FunctionName: "getUser",
 		RequestData:  UserQueryParam{ID: 1},
 		ResponseData: user,

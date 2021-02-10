@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-func (d *Desire) write(conn net.Conn, option Option) error {
+func (d *Desire) write(conn net.Conn, option CallOption) error {
 	ptcBytes, err := makeProtocolBytes(option.FunctionName, option.RequestData, option.Header)
 	if err != nil {
 		return err
