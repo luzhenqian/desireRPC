@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"desire/serializer"
+	"desire/types"
 	"desire/utils"
 )
 
@@ -26,14 +27,11 @@ const LengthLen = 4
 
 // FixedHeader 固定协议头
 type FixedHeader struct {
-	Length       Length // 0 1 2 3 byte
-	HeaderLength uint16 // 4 5 byte
-	Version      uint16 // 6 7 byte
-	MessageID    uint16 // 8 9 byte
+	Length       types.Length       // 0 1 2 3 byte
+	HeaderLength types.HeaderLength // 4 5 byte
+	Version      types.Version      // 6 7 byte
+	MessageID    types.MessageID    // 8 9 byte
 }
-
-// Length 数据包整体长度
-type Length uint32
 
 // VariableHeader 可变协议头
 type VariableHeader map[string]string
@@ -43,7 +41,7 @@ func (d *Desire) Pack() ([]byte, error) {
 	var ret []byte
 
 	// 协议体
-	payload, err := d.s.Serializer(d.Payload)
+	payload, err := d.s.Marshal(d.Payload)
 
 	if err != nil {
 		return nil, err
@@ -51,7 +49,7 @@ func (d *Desire) Pack() ([]byte, error) {
 	payloadLength := len(payload)
 
 	// 扩展协议头
-	variable, err := d.s.Serializer(d.Header.Variable)
+	variable, err := d.s.Marshal(d.Header.Variable)
 	if err != nil {
 		return nil, err
 	}
@@ -60,17 +58,16 @@ func (d *Desire) Pack() ([]byte, error) {
 
 	length := headerLength + payloadLength
 
-	// TODO 消除 utils 转到 serializer
-	lengthBytes := utils.Uint32ToBytes(uint32(length))
+	lengthBytes := d.s.MarshalLength(types.Length(length))
 	ret = append(ret, lengthBytes...) // 设置完整报文长度
 
-	headerLengthBytes := utils.Uint16ToBytes(uint16(headerLength))
+	headerLengthBytes := d.s.MarshalHeaderLength(types.HeaderLength(headerLength))
 	ret = append(ret, headerLengthBytes...) // 设置协议头长度
 
-	versionBytes := utils.Uint16ToBytes(d.Header.Version) // 版本
-	ret = append(ret, versionBytes...)                    // 设置协议版本
+	versionBytes := d.s.MarshalVersion(d.Header.Version) // 版本
+	ret = append(ret, versionBytes...)                   // 设置协议版本
 
-	messageIDBytes := utils.Uint16ToBytes(d.Header.MessageID)
+	messageIDBytes := d.s.MarshalMessageID(d.Header.MessageID)
 	ret = append(ret, messageIDBytes...) // 设置消息 ID
 
 	ret = append(ret, payload...) // 设置协议体
@@ -81,10 +78,10 @@ func (d *Desire) Pack() ([]byte, error) {
 // Unpack 拆包
 // 第二个参数 payload 需要是一个指针类型，拆包过程会给 payload 赋值
 func (d *Desire) Unpack(b []byte, payload interface{}) error {
-	d.Header.Length = Length(utils.BytesToUint32(b[:LengthLen]))
-	d.Header.HeaderLength = utils.BytesToUint16(b[LengthLen : FixedHeaderLen-LengthLen])
+	d.Header.Length = types.Length(utils.BytesToUint32(b[:LengthLen]))
+	d.Header.HeaderLength = d.s.UnmarshalHeaderLength(b[LengthLen : FixedHeaderLen-LengthLen])
 	payloadBytes := b[d.Header.HeaderLength:]
-	err := d.s.Unserializer(payloadBytes, payload)
+	err := d.s.UnMarshal(payloadBytes, payload)
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bytes"
+	"desire/types"
 	"encoding/binary"
 	"net"
 )
@@ -22,18 +23,18 @@ func (d *Desire) Read(conn net.Conn, response Response) error {
 	return dp.Unpack(bs, response)
 }
 
-func readLength(conn net.Conn) (Length, error) {
+func readLength(conn net.Conn) (types.Length, error) {
 	b := make([]byte, LengthLen)
 	if _, err := conn.Read(b); err != nil {
 		return 0, err
 	}
 	bytesBuffer := bytes.NewBuffer(b)
-	var length Length
+	var length types.Length
 	binary.Read(bytesBuffer, binary.BigEndian, &length)
 	return length, nil
 }
 
-func readAll(conn net.Conn, length Length) ([]byte, error) {
+func readAll(conn net.Conn, length types.Length) ([]byte, error) {
 	b := make([]byte, int(length-LengthLen))
 	if _, err := conn.Read(b); err != nil {
 		return nil, err
